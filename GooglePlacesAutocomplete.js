@@ -1,17 +1,18 @@
 /* eslint-disable react-native/no-inline-styles */
+import { Feather } from '@expo/vector-icons';
 import debounce from 'lodash.debounce';
 import PropTypes from 'prop-types';
 import Qs from 'qs';
-import { v4 as uuidv4 } from 'uuid';
 import React, {
   forwardRef,
-  useMemo,
+  useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
-  useCallback,
 } from 'react';
+import { TouchableOpacity } from 'react-native';
 import {
   ActivityIndicator,
   FlatList,
@@ -153,14 +154,11 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 
   const [stateText, setStateText] = useState('');
   const [dataSource, setDataSource] = useState(buildRowsFromResults([]));
-  const [listViewDisplayed, setListViewDisplayed] = useState(
-    props.listViewDisplayed === 'auto' ? false : props.listViewDisplayed,
-  );
   const [url, setUrl] = useState(getRequestUrl(props.requestUrl));
   const [listLoaderDisplayed, setListLoaderDisplayed] = useState(false);
 
   const inputRef = useRef();
-  const [sessionToken, setSessionToken] = useState(uuidv4());
+
   useEffect(() => {
     setUrl(getRequestUrl(props.requestUrl));
   }, [getRequestUrl, props.requestUrl]);
@@ -282,14 +280,10 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 
         if (request.status === 200) {
           const responseJSON = JSON.parse(request.responseText);
-          if (
-            responseJSON.status === 'OK' ||
-            (props.isNewPlacesAPI && responseJSON.id)
-          ) {
+
+          if (responseJSON.status === 'OK') {
             // if (_isMounted === true) {
-            const details = props.isNewPlacesAPI
-              ? responseJSON
-              : responseJSON.result;
+            const details = responseJSON.result;
             _disableRowLoaders();
             _onBlur();
 
@@ -327,29 +321,16 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
         }
       };
 
-      if (props.isNewPlacesAPI) {
-        request.open(
-          'GET',
-          `${url}/v1/places/${rowData.place_id}?` +
-            Qs.stringify({
-              key: props.query.key,
-              sessionToken,
-              fields: props.fields,
-            }),
-        );
-        setSessionToken(uuidv4());
-      } else {
-        request.open(
-          'GET',
-          `${url}/place/details/json?` +
-            Qs.stringify({
-              key: props.query.key,
-              placeid: rowData.place_id,
-              language: props.query.language,
-              ...props.GooglePlacesDetailsQuery,
-            }),
-        );
-      }
+      request.open(
+        'GET',
+        `${url}/place/details/json?` +
+        Qs.stringify({
+          key: props.query.key,
+          placeid: rowData.place_id,
+          language: props.query.language,
+          ...props.GooglePlacesDetailsQuery,
+        }),
+      );
 
       request.withCredentials = requestShouldUseWithCredentials();
       setRequestHeaders(request, getRequestHeaders(props.requestUrl));
@@ -432,29 +413,6 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 
       if (found === true) {
         results.push(unfilteredResults[i]);
-      }
-    }
-    return results;
-  };
-
-  const _filterResultsByPlacePredictions = (unfilteredResults) => {
-    const results = [];
-    for (let i = 0; i < unfilteredResults.length; i++) {
-      if (unfilteredResults[i].placePrediction) {
-        results.push({
-          description: unfilteredResults[i].placePrediction.text?.text,
-          place_id: unfilteredResults[i].placePrediction.placeId,
-          reference: unfilteredResults[i].placePrediction.placeId,
-          structured_formatting: {
-            main_text:
-              unfilteredResults[i].placePrediction.structuredFormat?.mainText
-                ?.text,
-            secondary_text:
-              unfilteredResults[i].placePrediction.structuredFormat
-                ?.secondaryText?.text,
-          },
-          types: unfilteredResults[i].placePrediction.types ?? [],
-        });
       }
     }
     return results;
@@ -565,28 +523,19 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
         setListLoaderDisplayed(false);
         if (request.status === 200) {
           const responseJSON = JSON.parse(request.responseText);
-
           if (typeof responseJSON.predictions !== 'undefined') {
             // if (_isMounted === true) {
             const results =
               props.nearbyPlacesAPI === 'GoogleReverseGeocoding'
                 ? _filterResultsByTypes(
-                    responseJSON.predictions,
-                    props.filterReverseGeocodingByTypes,
-                  )
+                  responseJSON.predictions,
+                  props.filterReverseGeocodingByTypes,
+                )
                 : responseJSON.predictions;
 
             _results = results;
             setDataSource(buildRowsFromResults(results, text));
             // }
-          }
-          if (typeof responseJSON.suggestions !== 'undefined') {
-            const results = _filterResultsByPlacePredictions(
-              responseJSON.suggestions,
-            );
-
-            _results = results;
-            setDataSource(buildRowsFromResults(results, text));
           }
           if (typeof responseJSON.error_message !== 'undefined') {
             if (!props.onFail)
@@ -606,39 +555,18 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
         setStateText(props.preProcess(text));
       }
 
-      if (props.isNewPlacesAPI) {
-        const keyQueryParam = props.query.key
-          ? '?' +
-            Qs.stringify({
-              key: props.query.key,
-            })
-          : '';
-        request.open('POST', `${url}/v1/places:autocomplete${keyQueryParam}`);
-      } else {
-        request.open(
-          'GET',
-          `${url}/place/autocomplete/json?input=` +
-            encodeURIComponent(text) +
-            '&' +
-            Qs.stringify(props.query),
-        );
-      }
+      request.open(
+        'GET',
+        `${url}/place/autocomplete/json?input=` +
+        encodeURIComponent(text) +
+        '&' +
+        Qs.stringify(props.query),
+      );
 
       request.withCredentials = requestShouldUseWithCredentials();
       setRequestHeaders(request, getRequestHeaders(props.requestUrl));
 
-      if (props.isNewPlacesAPI) {
-        const { key, locationbias, types, ...rest } = props.query;
-        request.send(
-          JSON.stringify({
-            input: text,
-            sessionToken,
-            ...rest,
-          }),
-        );
-      } else {
-        request.send();
-      }
+      request.send();
     } else {
       _results = [];
       setDataSource(buildRowsFromResults([]));
@@ -735,8 +663,8 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
               backgroundColor: pressed
                 ? props.listUnderlayColor
                 : hovered
-                ? props.listHoverColor
-                : undefined,
+                  ? props.listHoverColor
+                  : undefined,
             },
           ]}
           onPress={() => _onPress(rowData)}
@@ -790,15 +718,13 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
   };
 
   const _onBlur = (e) => {
+    if (e) {
+      _handleChangeText(e.nativeEvent.text);
+    }
     if (e && isNewFocusInAutocompleteResultList(e)) return;
 
-    if (!props.keepResultsAfterBlur) {
-      setListViewDisplayed(false);
-    }
     inputRef?.current?.blur();
   };
-
-  const _onFocus = () => setListViewDisplayed(true);
 
   const _renderPoweredLogo = () => {
     if (!_shouldShowPoweredLogo()) {
@@ -858,14 +784,7 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 
   const _getFlatList = () => {
     const keyGenerator = () => Math.random().toString(36).substr(2, 10);
-
-    if (
-      supportedPlatform() &&
-      (stateText !== '' ||
-        props.predefinedPlaces.length > 0 ||
-        props.currentLocation === true) &&
-      listViewDisplayed === true
-    ) {
+    if (dataSource.length > 0) {
       return (
         <FlatList
           nativeID='result-list-id'
@@ -922,34 +841,55 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
           ]}
         >
           {_renderLeftButton()}
-          <TextInputComp
-            ref={inputRef}
-            style={[
-              props.suppressDefaultStyles ? {} : defaultStyles.textInput,
-              props.styles.textInput,
-            ]}
-            value={stateText}
-            placeholder={props.placeholder}
-            onFocus={
-              onFocus
-                ? (e) => {
-                    _onFocus();
-                    onFocus(e);
-                  }
-                : _onFocus
-            }
-            onBlur={
-              onBlur
-                ? (e) => {
+          <View style={[{
+            borderRadius: 5,
+          }, props.styles.textInput]}>
+            <TextInputComp
+              ref={inputRef}
+              style={[
+                props.suppressDefaultStyles ? {} : defaultStyles.textInput,
+                {
+                  backgroundColor: "transparent",
+                  fontFamily: "Jost_400Regular",
+                  fontSize: 18,
+                  width: "95%",
+                  color: props.styles.textInput.color,
+                  height: '100%'
+
+                }
+              ]}
+              placeholder={props.placeholder}
+              onFocus={onFocus}
+              onBlur={
+                onBlur
+                  ? (e) => {
                     _onBlur(e);
                     onBlur(e);
                   }
-                : _onBlur
-            }
-            clearButtonMode={clearButtonMode || 'while-editing'}
-            onChangeText={_handleChangeText}
-            {...userProps}
-          />
+                  : _onBlur
+              }
+              blurOnSubmit
+              {...userProps}
+            />
+            <TouchableOpacity
+              style={{
+                alignSelf: "center",
+              }}
+              onPress={() => {
+                inputRef.current.clear()
+                props?.onClear()
+                setDataSource([])
+                setStateText('')
+              }}
+            >
+              <Feather
+                name="x"
+                color={props.styles.textInput.color}
+                style={{ marginTop: 0.5 }}
+                size={24}
+              />
+            </TouchableOpacity>
+          </View>
           {_renderRightButton()}
         </View>
       )}
@@ -961,6 +901,7 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 });
 
 GooglePlacesAutocomplete.propTypes = {
+  onClear: PropTypes.func,
   autoFillOnNotFound: PropTypes.bool,
   currentLocation: PropTypes.bool,
   currentLocationLabel: PropTypes.string,
@@ -1013,8 +954,6 @@ GooglePlacesAutocomplete.propTypes = {
   textInputHide: PropTypes.bool,
   textInputProps: PropTypes.object,
   timeout: PropTypes.number,
-  isNewPlacesAPI: PropTypes.bool,
-  fields: PropTypes.string,
 };
 
 GooglePlacesAutocomplete.defaultProps = {
@@ -1042,9 +981,9 @@ GooglePlacesAutocomplete.defaultProps = {
   minLength: 0,
   nearbyPlacesAPI: 'GooglePlacesSearch',
   numberOfLines: 1,
-  onFail: () => {},
-  onNotFound: () => {},
-  onPress: () => {},
+  onFail: () => { },
+  onNotFound: () => { },
+  onPress: () => { },
   onTimeout: () => console.warn('google places autocomplete: request timeout'),
   placeholder: '',
   predefinedPlaces: [],
@@ -1059,8 +998,6 @@ GooglePlacesAutocomplete.defaultProps = {
   textInputHide: false,
   textInputProps: {},
   timeout: 20000,
-  isNewPlacesAPI: false,
-  fields: '*',
 };
 
 GooglePlacesAutocomplete.displayName = 'GooglePlacesAutocomplete';
