@@ -860,6 +860,12 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
               ]}
               placeholder={props.placeholder}
               onFocus={onFocus}
+              onEndEditing={onBlur
+                  ? (e) => {
+                    _onBlur(e);
+                    onBlur(e);
+                  }
+                  : _onBlur}
               onBlur={
                 onBlur
                   ? (e) => {
