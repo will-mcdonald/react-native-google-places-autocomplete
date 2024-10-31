@@ -182,7 +182,11 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
       setStateText(address);
     },
     getAddressText: () => stateText,
-    blur: () => inputRef.current.blur(),
+    blur: () => {
+      inputRef.current.blur()
+      inputRef.current.focus()
+      inputRef.current.blur()
+    },
     focus: () => inputRef.current.focus(),
     isFocused: () => inputRef.current.isFocused(),
     clear: () => inputRef.current.clear(),
