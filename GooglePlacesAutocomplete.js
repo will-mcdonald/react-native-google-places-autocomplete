@@ -1,9 +1,10 @@
 /* eslint-disable react-native/no-inline-styles */
 import { Feather } from '@expo/vector-icons';
+import { ActivityIndicator } from "react-native-paper";
 import debounce from 'lodash.debounce';
 import PropTypes from 'prop-types';
 import Qs from 'qs';
-import React, {
+import {
   forwardRef,
   useCallback,
   useEffect,
@@ -12,9 +13,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { TouchableOpacity } from 'react-native';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Keyboard,
@@ -23,8 +22,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  View,
+  TextInput, TouchableOpacity, View
 } from 'react-native';
 
 const defaultStyles = {
@@ -152,6 +150,7 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
     );
   };
 
+  const [isLoading, setIsLoading] = useState(false)
   const [stateText, setStateText] = useState('');
   const [dataSource, setDataSource] = useState(buildRowsFromResults([]));
   const [url, setUrl] = useState(getRequestUrl(props.requestUrl));
@@ -260,7 +259,9 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
       );
   };
 
+
   const _onPress = (rowData) => {
+    setIsLoading(true)
     if (rowData.isPredefinedPlace !== true && props.fetchDetails === true) {
       if (rowData.isLoading === true) {
         // already requesting
@@ -360,7 +361,9 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
     }
   };
 
+  
   const _enableRowLoader = (rowData) => {
+    setIsLoading(true)
     let rows = buildRowsFromResults(_results);
     for (let i = 0; i < rows.length; i++) {
       if (
@@ -377,12 +380,13 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 
   const _disableRowLoaders = () => {
     // if (_isMounted === true) {
+    setIsLoading(false)
     for (let i = 0; i < _results.length; i++) {
       if (_results[i].isLoading === true) {
         _results[i].isLoading = false;
       }
     }
-
+    
     setDataSource(buildRowsFromResults(_results));
     // }
   };
@@ -436,6 +440,7 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
       request.timeout = props.timeout;
       request.ontimeout = props.onTimeout;
       request.onreadystatechange = () => {
+        props?.onEndLoading()
         if (request.readyState !== 4) {
           setListLoaderDisplayed(true);
           return;
@@ -514,6 +519,7 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
       return;
     }
     if (supportedPlatform() && text && text.length >= props.minLength) {
+      setIsLoading(true)
       const request = new XMLHttpRequest();
       _requests.push(request);
       request.timeout = props.timeout;
@@ -528,7 +534,6 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
         if (request.status === 200) {
           const responseJSON = JSON.parse(request.responseText);
           if (typeof responseJSON.predictions !== 'undefined') {
-            // if (_isMounted === true) {
             const results =
               props.nearbyPlacesAPI === 'GoogleReverseGeocoding'
                 ? _filterResultsByTypes(
@@ -539,7 +544,6 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
 
             _results = results;
             setDataSource(buildRowsFromResults(results, text));
-            // }
           }
           if (typeof responseJSON.error_message !== 'undefined') {
             if (!props.onFail)
@@ -553,6 +557,7 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
         } else {
           // console.warn("google places autocomplete: request could not be completed or has been aborted");
         }
+        setIsLoading(false)
       };
 
       if (props.preProcess) {
@@ -781,6 +786,9 @@ export const GooglePlacesAutocomplete = forwardRef((props, ref) => {
   };
 
   const _renderRightButton = () => {
+    if(isLoading){
+      return <ActivityIndicator color={props.loadingColor}/>
+    }
     if (props.renderRightButton) {
       return props.renderRightButton();
     }
