@@ -432,6 +432,7 @@ interface GooglePlacesAutocompleteProps {
   /** text input props */
   textInputProps?: TextInputProps | Object;
   timeout?: number;
+  loadingColor?:string
 }
 
 export type GooglePlacesAutocompleteRef = {
